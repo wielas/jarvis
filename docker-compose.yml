@@ -1,0 +1,12 @@
+services:
+  voice-service:
+    build: .
+    image: voice-service:latest
+    container_name: jarvis-ears
+    devices:
+      - /dev/snd:/dev/snd  # Access to host audio devices
+    volumes:
+      - .:/app             # Mount current directory for development
+    restart: unless-stopped
+    environment:
+      - PYTHONUNBUFFERED=1
