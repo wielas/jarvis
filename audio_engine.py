@@ -61,7 +61,7 @@ class AudioEngine:
             chunk = await self.q.get()
             
             # Feed to wake word model
-            prediction = self.oww_model.predict(chunk)
+            prediction = self.oww_model.predict(chunk.flatten())
             
             # Check for wake word
             if prediction["hey_jarvis"] >= 0.5:
