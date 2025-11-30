@@ -3,3 +3,5 @@ numpy
 openwakeword
 faster-whisper
 colorama
+ollama
+pydantic
