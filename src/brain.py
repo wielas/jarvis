@@ -42,8 +42,15 @@ class Brain:
         try:
             logger.info(f"Checking for model '{self.model_name}'...")
             models = await self.client.list()
-            # models['models'] is a list of objects
-            model_names = [m['name'] for m in models['models']]
+            # models['models'] is a list of objects, which might be dicts or objects depending on client version
+            # The error 'name' suggests we might be accessing it wrong or the structure is different
+            model_names = []
+            for m in models['models']:
+                if isinstance(m, dict):
+                    model_names.append(m.get('name', ''))
+                else:
+                    # If it's an object (pydantic model etc), try attribute access
+                    model_names.append(getattr(m, 'model', getattr(m, 'name', '')))
             
             # Check if model exists
             if not any(self.model_name in m for m in model_names):
