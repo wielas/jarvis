@@ -76,9 +76,10 @@ class Brain:
         
         1. Light Control: {"intent": "light_control", "location": "room name", "action": "on/off/...", "color": "...", "brightness": 0-100}
         2. Music Control: {"intent": "music_control", "action": "play/pause/...", "song": "...", "artist": "..."}
-        3. General Query: {"intent": "general_query", "query": "..."}
+        3. General Query: {"intent": "general_query", "query": "...", "response": "Short answer to the user's query"}
         
         If the input is unclear, default to General Query.
+        For General Queries, YOU MUST GENERATE A CONCISE RESPONSE in the "response" field.
         Do not output any markdown or explanations, ONLY the JSON object.
         """
         

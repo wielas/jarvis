@@ -6,6 +6,9 @@ from src.audio_stream import AudioStream
 from src.wake_word import WakeWordDetector
 from src.transcriber import Transcriber
 from src.brain import Brain
+from src.home_assistant import HomeAssistantClient
+from src.dispatcher import Dispatcher
+from src.voice import Voice
 
 logger = setup_logger("AudioEngine")
 
@@ -16,6 +19,9 @@ class AudioEngine:
         self.wake_word_detector = WakeWordDetector(config.wake_word)
         self.transcriber = Transcriber(config.transcriber)
         self.brain = Brain(config)
+        self.ha_client = HomeAssistantClient(config.ha)
+        self.dispatcher = Dispatcher(self.ha_client)
+        self.voice = Voice()
         self.running = False
 
     async def start(self):
@@ -25,8 +31,14 @@ class AudioEngine:
         # Ensure brain model is ready
         await self.brain.ensure_model()
         
+        # Check HA connection
+        await self.ha_client.check_connection()
+        
         self.stream.start()
         logger.info("Engine started. Listening for commands...")
+        
+        # Greet the user
+        await self.voice.speak("Jarvis is online.")
         
         try:
             await self._event_loop()
@@ -42,7 +54,7 @@ class AudioEngine:
         logger.info("Engine stopped")
 
     async def _event_loop(self):
-        """Main processing loop: Listen -> Detect -> Record -> Transcribe -> Think"""
+        """Main processing loop: Listen -> Detect -> Record -> Transcribe -> Think -> Act -> Speak"""
         logger.info("State: LISTENING")
         
         while self.running:
@@ -69,6 +81,24 @@ class AudioEngine:
                     logger.info("State: THINKING")
                     intent = await self.brain.process(text)
                     logger.info(f"Intent: {intent}")
+                    
+                    # 5. Action Dispatch & Speech
+                    if isinstance(intent, dict) and intent.get("intent") != "error":
+                        logger.info("State: ACTING")
+                        await self.dispatcher.dispatch(intent)
+                        
+                        # 6. Voice Feedback
+                        if intent.get("intent") == "general_query":
+                            response = intent.get("response")
+                            if response:
+                                await self.voice.speak(response)
+                        elif intent.get("intent") == "light_control":
+                             # Simple confirmation
+                             action = intent.get("action", "switching")
+                             location = intent.get("location", "lights")
+                             await self.voice.speak(f"Turning {action} {location} lights.")
+                        elif intent.get("intent") == "music_control":
+                             await self.voice.speak("Playing music.")
                     
                 else:
                     logger.warning("No speech detected or transcription failed.")

@@ -5,3 +5,5 @@ faster-whisper
 colorama
 ollama
 pydantic
+aiohttp
+pyttsx3

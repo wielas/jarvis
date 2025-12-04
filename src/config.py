@@ -31,11 +31,18 @@ class BrainConfig:
     model_name: str = os.getenv("OLLAMA_MODEL", "phi3")
 
 @dataclass
+class HomeAssistantConfig:
+    url: str = os.getenv("HA_URL", "http://homeassistant.local:8123")
+    token: str = os.getenv("HA_TOKEN", "")
+    timeout: int = 5
+
+@dataclass
 class AppConfig:
     audio: AudioConfig = field(default_factory=AudioConfig)
     wake_word: WakeWordConfig = field(default_factory=WakeWordConfig)
     transcriber: TranscriberConfig = field(default_factory=TranscriberConfig)
     brain: BrainConfig = field(default_factory=BrainConfig)
+    ha: HomeAssistantConfig = field(default_factory=HomeAssistantConfig)
     
     # Recording settings
     record_seconds: int = 5
