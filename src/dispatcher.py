@@ -24,31 +24,27 @@ class Dispatcher:
         location = intent.get("location", "").lower()
         action = intent.get("action", "on")
         
-        # Simple fuzzy matching for entity ID
-        # In a real app, we'd query HA states to find the best match
-        entity_id = self._find_entity_id("light", location)
+        entity_id = await self._find_entity_id("light", location)
         
         if not entity_id:
             logger.warning(f"No light entity found for location: {location}")
             return
 
         service = "turn_on" if action == "on" else "turn_off"
-        # Handle other actions like toggle, dim, etc. if needed
+        # Handle toggle
+        if action == "toggle": service = "toggle"
         
         data = {"entity_id": entity_id}
         if action == "on" and intent.get("brightness"):
              data["brightness_pct"] = intent["brightness"]
-        if action == "on" and intent.get("color"):
-            # This is complex as HA expects RGB or color name, simplifying for now
-            pass
 
         logger.info(f"Dispatching Light Control: {service} -> {entity_id}")
         await self.ha.call_service("light", service, data)
 
     async def _handle_music_control(self, intent: dict):
         action = intent.get("action")
-        # Assuming a default media player for now
-        entity_id = "media_player.living_room_speaker" 
+        # Try to find a media player, default to first found or specific one
+        entity_id = await self._find_entity_id("media_player", "speaker") or "media_player.living_room_speaker"
         
         service_map = {
             "play": "media_play",
@@ -69,13 +65,29 @@ class Dispatcher:
     async def _handle_general_query(self, intent: dict):
         query = intent.get("query")
         logger.info(f"General Query (No Action): {query}")
-        # In Phase 4 (TTS), we would speak the answer here.
 
-    def _find_entity_id(self, domain: str, keyword: str) -> str:
+    async def _find_entity_id(self, domain: str, keyword: str) -> str:
         """
-        Helper to find an entity ID based on a keyword.
-        For now, returns a mock ID if no token is present, or tries to guess.
+        Finds the best matching entity ID for a given domain and keyword.
+        Fetches states from HA to do the lookup.
         """
-        # Mock logic for demonstration
-        safe_keyword = keyword.replace(" ", "_")
-        return f"{domain}.{safe_keyword}"
+        states = await self.ha.get_states()
+        if not states:
+            # Fallback for mock mode
+            return f"{domain}.{keyword.replace(' ', '_')}"
+
+        # Filter by domain
+        candidates = [s for s in states if s['entity_id'].startswith(f"{domain}.")]
+        
+        # 1. Exact match on friendly_name
+        for state in candidates:
+            name = state.get('attributes', {}).get('friendly_name', '').lower()
+            if keyword in name:
+                return state['entity_id']
+                
+        # 2. Match on entity_id
+        for state in candidates:
+            if keyword in state['entity_id']:
+                return state['entity_id']
+                
+        return None

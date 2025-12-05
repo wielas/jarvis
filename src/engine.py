@@ -66,6 +66,27 @@ class AudioEngine:
             if score >= self.config.wake_word.threshold:
                 logger.info(f"Wake Word Detected! (Score: {score:.2f})")
                 
+                if self.config.test_mode:
+                    # --- TEST MODE PATH ---
+                    logger.info("TEST MODE: Skipping Record/Transcribe/Think. Toggling lights.")
+                    
+                    # Mock Intent
+                    intent = {
+                        "intent": "light_control",
+                        "location": "bedroom",
+                        "action": "toggle"
+                    }
+                    
+                    logger.info("State: ACTING")
+                    await self.dispatcher.dispatch(intent)
+                    await self.voice.speak("Test mode: Toggling bedroom lights.")
+                    
+                    # Reset
+                    logger.info("State: LISTENING")
+                    self.stream.clear_queue()
+                    continue
+                
+                # --- NORMAL PATH ---
                 # 2. Record Audio
                 logger.info("State: RECORDING")
                 audio_buffer = await self._capture_audio(seconds=self.config.record_seconds)

@@ -93,7 +93,25 @@ class Brain:
             logger.info(f"Brain thought: {content}")
             
             import json
-            return json.loads(content)
+            import re
+            
+            # Clean up potential markdown code blocks
+            content = content.strip()
+            if "```" in content:
+                # Extract content between code blocks
+                match = re.search(r"```(?:json)?(.*?)```", content, re.DOTALL)
+                if match:
+                    content = match.group(1).strip()
+            
+            # Find the first '{' and last '}'
+            start = content.find('{')
+            end = content.rfind('}')
+            
+            if start != -1 and end != -1:
+                content = content[start:end+1]
+                return json.loads(content)
+            else:
+                raise ValueError("No JSON object found in response")
             
         except Exception as e:
             logger.error(f"Brain processing failed: {e}")

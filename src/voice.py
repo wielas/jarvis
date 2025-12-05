@@ -1,5 +1,7 @@
 import pyttsx3
 import asyncio
+import threading
+import queue
 from src.logger import setup_logger
 
 logger = setup_logger("Voice")
@@ -7,52 +9,53 @@ logger = setup_logger("Voice")
 class Voice:
     def __init__(self):
         self.loop = asyncio.get_running_loop()
-        self._engine = None
-        # Initialize engine in a way that doesn't block immediately if possible, 
-        # but pyttsx3 init is usually fast.
+        self._queue = queue.Queue()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="TTS-Thread")
+        self._thread.start()
+        logger.info("Voice engine thread started.")
+
+    def _run_loop(self):
+        """
+        Runs the TTS engine in a dedicated thread.
+        This ensures thread safety for pyttsx3/espeak.
+        """
         try:
-            self._engine = pyttsx3.init()
-            self._engine.setProperty('rate', 150)  # Speed
-            self._engine.setProperty('volume', 1.0) # Volume
+            engine = pyttsx3.init()
+            engine.setProperty('rate', 150)
+            engine.setProperty('volume', 1.0)
             
-            # Select a voice (optional, usually defaults to system default)
-            voices = self._engine.getProperty('voices')
-            if voices:
-                # Prefer a female voice if available (often index 1 on some systems, but varies)
-                # self._engine.setProperty('voice', voices[1].id)
-                pass
-                
-            logger.info("Voice engine initialized.")
+            # Optional: Select voice
+            # voices = engine.getProperty('voices')
+            # if voices: engine.setProperty('voice', voices[1].id)
+            
+            while True:
+                try:
+                    text = self._queue.get()
+                    if text is None: # Sentinel to stop
+                        break
+                    
+                    logger.debug(f"Speaking: {text}")
+                    engine.say(text)
+                    engine.runAndWait()
+                    self._queue.task_done()
+                except Exception as e:
+                    logger.error(f"Error in TTS loop: {e}")
+                    
         except Exception as e:
-            logger.error(f"Failed to initialize voice engine: {e}")
+            logger.critical(f"Failed to initialize TTS engine in thread: {e}")
 
     async def speak(self, text: str):
         """
-        Speaks the given text asynchronously.
+        Queues the text to be spoken.
+        This method is non-blocking.
         """
-        if not self._engine:
-            logger.warning(f"Voice engine not available. Would say: '{text}'")
-            return
+        logger.info(f"Queueing speech: '{text}'")
+        self._queue.put(text)
+        # We don't await here because we want to return control immediately
+        # If we wanted to wait for speech to finish, we'd need a callback or future.
 
-        logger.info(f"Speaking: '{text}'")
-        
-        # Run the blocking speak loop in a separate executor
-        await self.loop.run_in_executor(None, self._speak_sync, text)
-
-    def _speak_sync(self, text: str):
-        """
-        Blocking speak function to be run in a thread.
-        """
-        try:
-            # We need to create a new engine instance for each thread if the main one isn't thread safe
-            # pyttsx3 is known to be finicky with threads. 
-            # Best practice often involves a dedicated event loop for the engine or re-init.
-            # However, runAndWait() blocks.
-            
-            # Simple approach: use the existing engine but ensure lock if needed.
-            # For now, let's try direct usage. If it crashes, we might need a dedicated process.
-            
-            self._engine.say(text)
-            self._engine.runAndWait()
-        except Exception as e:
-            logger.error(f"Error during speech: {e}")
+    def stop(self):
+        """Stops the TTS thread"""
+        self._queue.put(None)
+        if self._thread.is_alive():
+            self._thread.join(timeout=1.0)

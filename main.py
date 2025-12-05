@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import signal
+import argparse
 from src.config import AppConfig
 from src.engine import AudioEngine
 from src.logger import setup_logger
@@ -8,10 +9,20 @@ from src.logger import setup_logger
 logger = setup_logger("Main")
 
 async def main():
+    parser = argparse.ArgumentParser(description="Jarvis Voice Assistant")
+    parser.add_argument("-t", "--test", action="store_true", help="Run in minimal test mode (Wake Word -> Toggle Lights)")
+    args = parser.parse_args()
+
     logger.info("Initializing Jarvis...")
     
     # Load configuration
     config = AppConfig()
+    config.test_mode = args.test
+    
+    if config.test_mode:
+        logger.info("⚠️ RUNNING IN TEST MODE: Wake Word will trigger 'Toggle Bedroom Lights' directly.")
+
+    engine = AudioEngine(config)
     
     # Initialize Engine
     try:

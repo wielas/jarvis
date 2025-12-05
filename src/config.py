@@ -46,3 +46,6 @@ class AppConfig:
     
     # Recording settings
     record_seconds: int = 5
+    
+    # Test mode flag
+    test_mode: bool = False
